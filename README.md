@@ -190,14 +190,3 @@ docs/latex/     Technical report (LaTeX source and figures)
 topology/       Packet Tracer file
 ```
 
-## Report
-
-`docs/latex/PPRC-Muresan-Davide.tex` covers the design and every configuration
-step, with the verification output from the running network — spanning-tree
-convergence, OSPF adjacencies and routing tables, DHCP leases, DNS resolution.
-
-It also records what was learned in the process: why a ping failing in one
-direction and succeeding in the other locates a missing default gateway, and why
-a `TTL` of 254 rather than 255 proves a packet was routed rather than switched.
-
-
