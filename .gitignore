@@ -1,0 +1,14 @@
+# Working notes and drafts, not part of the published project
+docs/*.md
+docs/reference/
+docs/latex/*-RO.tex
+verification/
+
+# LaTeX build artefacts
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk

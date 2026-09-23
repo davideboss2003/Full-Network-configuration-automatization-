@@ -1,0 +1,68 @@
+! ============================================================================
+! {{ sw.hostname }} -- access switch, zone {{ zone.label }}
+!
+! GENERATED FILE -- do not edit.
+! Source: automation/inventory.yml -> render with automation/render.py
+! ============================================================================
+enable
+configure terminal
+!
+hostname {{ sw.hostname }}
+!
+! --- VLANs ------------------------------------------------------------------
+vlan {{ zone.user_vlan.id }}
+ name {{ zone.user_vlan.name }}
+exit
+!
+vlan {{ zone.mgmt_vlan.id }}
+ name {{ zone.mgmt_vlan.name }}
+exit
+!
+! --- Trunk links ------------------------------------------------------------
+{% for t in sw.trunks %}
+interface fastEthernet 0/{{ t.port }}
+ description Trunk to {{ t.to }}
+ switchport mode trunk
+ switchport trunk allowed vlan {{ zone.user_vlan.id }},{{ zone.mgmt_vlan.id }}
+exit
+!
+{% endfor %}
+! --- Access ports -----------------------------------------------------------
+{% for r in access_ranges %}
+{% if r.first == r.last %}
+interface fastEthernet 0/{{ r.first }}
+{% else %}
+interface range fastEthernet 0/{{ r.first }}-{{ r.last }}
+{% endif %}
+ switchport mode access
+ switchport access vlan {{ zone.user_vlan.id }}
+exit
+!
+{% endfor %}
+interface range gigabitEthernet 0/1-2
+ switchport mode access
+ switchport access vlan {{ zone.user_vlan.id }}
+exit
+!
+! --- Management interface ---------------------------------------------------
+interface vlan {{ zone.mgmt_vlan.id }}
+ description Management SVI
+ ip address {{ sw.mgmt_ip }} {{ zone.mgmt_vlan.mask }}
+ no shutdown
+exit
+!
+ip default-gateway {{ zone.mgmt_vlan.gateway }}
+!
+{% if sw.stp %}
+! --- Spanning Tree ----------------------------------------------------------
+spanning-tree vlan {{ zone.user_vlan.id }},{{ zone.mgmt_vlan.id }} root {{ sw.stp }}
+!
+{% else %}
+! --- Spanning Tree ----------------------------------------------------------
+! No command: this switch keeps the default priority of 32768 and is therefore
+! the one that blocks a port to break the loop.
+!
+{% endif %}
+end
+!
+copy running-config startup-config

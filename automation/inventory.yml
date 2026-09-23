@@ -1,0 +1,166 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Single source of truth for the PPRC network.
+#
+# Every file in configs/ is generated from this inventory by render.py.
+# Do not edit generated configurations by hand — edit this file and re-render.
+#
+# Port assignments were discovered on the live topology with
+# `show cdp neighbors` and cross-checked from both ends of every link.
+#
+# Wireless pre-shared keys are placeholders. Secrets do not belong in a
+# repository; on a real deployment they would come from a vault or an
+# environment variable at render time.
+# ─────────────────────────────────────────────────────────────────────────────
+
+defaults:
+  dns_server: 210.1.1.68
+  domain: davide.ro
+  # Every switch port that is not a trunk becomes an access port in the user VLAN
+  access_ports:
+    fastethernet: [1, 24]
+    gigabitethernet: [1, 2]
+  # Addresses .1 through .9 are reserved for infrastructure in every user subnet
+  dhcp_reserved_upto: 9
+
+zones:
+
+  # ───────────────────────────────────────────────────────────────────────────
+  SN1:
+    label: "Subnet 1"
+    user_vlan:
+      id: 10
+      name: Users-SN1
+      subnet: 172.16.10.0
+      mask: 255.255.255.0
+      gateway: 172.16.10.1
+    mgmt_vlan:
+      id: 110
+      name: Mgmt-SN1
+      subnet: 172.16.110.0
+      mask: 255.255.255.0
+      gateway: 172.16.110.1
+    wireless:
+      ap_label: "Access Point2"        # Packet Tracer canvas name
+      ssid: SN1-WiFi
+      authentication: WPA2-PSK
+      encryption: AES
+      passphrase: "<set per deployment>"   # not stored in version control
+    router:
+      hostname: SN1-RTR
+      lan_interface: fastEthernet 0/0
+      dhcp_pool: SN1-USERS
+    switches:
+      - hostname: SN1-SW1
+        mgmt_ip: 172.16.110.2
+        stp: primary
+        trunks:
+          - { port: 1, to: SN1-SW2 }
+          - { port: 2, to: SN1-SW3 }
+          - { port: 4, to: SN1-RTR }
+      - hostname: SN1-SW2
+        mgmt_ip: 172.16.110.3
+        stp: secondary
+        trunks:
+          - { port: 3, to: SN1-SW3 }
+          - { port: 4, to: SN1-SW1 }
+      - hostname: SN1-SW3
+        mgmt_ip: 172.16.110.4
+        stp: null
+        trunks:
+          - { port: 2, to: SN1-SW2 }
+          - { port: 4, to: SN1-SW1 }
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Configured by hand, command by command. Kept in the inventory so that the
+  # generator can be validated against a known-good result.
+  SN2:
+    label: "Subnet 2"
+    built_by_hand: true
+    user_vlan:
+      id: 20
+      name: Users-SN2
+      subnet: 172.16.20.0
+      mask: 255.255.255.0
+      gateway: 172.16.20.1
+    mgmt_vlan:
+      id: 120
+      name: Mgmt-SN2
+      subnet: 172.16.120.0
+      mask: 255.255.255.0
+      gateway: 172.16.120.1
+    wireless:
+      ap_label: "Access Point2(1)"        # Packet Tracer canvas name
+      ssid: SN2-WiFi
+      authentication: WPA2-PSK
+      encryption: AES
+      passphrase: "<set per deployment>"   # not stored in version control
+    router:
+      hostname: SN2-RTR
+      lan_interface: fastEthernet 0/0
+      dhcp_pool: SN2-USERS
+    switches:
+      - hostname: SN2-SW1
+        mgmt_ip: 172.16.120.2
+        stp: primary
+        trunks:
+          - { port: 1, to: SN2-SW2 }
+          - { port: 2, to: SN2-SW3 }
+          - { port: 3, to: SN2-RTR }
+      - hostname: SN2-SW2
+        mgmt_ip: 172.16.120.3
+        stp: secondary
+        trunks:
+          - { port: 3, to: SN2-SW3 }
+          - { port: 4, to: SN2-SW1 }
+      - hostname: SN2-SW3
+        mgmt_ip: 172.16.120.4
+        stp: null
+        trunks:
+          - { port: 2, to: SN2-SW2 }
+          - { port: 4, to: SN2-SW1 }
+
+  # ───────────────────────────────────────────────────────────────────────────
+  SN3:
+    label: "Subnet 3"
+    user_vlan:
+      id: 30
+      name: Users-SN3
+      subnet: 172.16.30.0
+      mask: 255.255.255.0
+      gateway: 172.16.30.1
+    mgmt_vlan:
+      id: 130
+      name: Mgmt-SN3
+      subnet: 172.16.130.0
+      mask: 255.255.255.0
+      gateway: 172.16.130.1
+    wireless:
+      ap_label: "Access Point2(2)"        # Packet Tracer canvas name
+      ssid: SN3-WiFi
+      authentication: WPA2-PSK
+      encryption: AES
+      passphrase: "<set per deployment>"   # not stored in version control
+    router:
+      hostname: SN3-RTR
+      lan_interface: fastEthernet 0/0
+      dhcp_pool: SN3-USERS
+    switches:
+      - hostname: SN3-SW1
+        mgmt_ip: 172.16.130.2
+        stp: primary
+        trunks:
+          - { port: 1, to: SN3-RTR }
+          - { port: 3, to: SN3-SW3 }
+          - { port: 4, to: SN3-SW2 }
+      - hostname: SN3-SW2
+        mgmt_ip: 172.16.130.3
+        stp: secondary
+        trunks:
+          - { port: 1, to: SN3-SW1 }
+          - { port: 2, to: SN3-SW3 }
+      - hostname: SN3-SW3
+        mgmt_ip: 172.16.130.4
+        stp: null
+        trunks:
+          - { port: 2, to: SN3-SW1 }
+          - { port: 4, to: SN3-SW2 }
