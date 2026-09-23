@@ -1,0 +1,36 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Design and configuration checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install --quiet pyyaml jinja2 pytest
+
+      - name: Render configurations from the inventory
+        run: python3 automation/render.py
+
+      - name: Fail if rendering changed a committed configuration
+        run: |
+          if ! git diff --quiet configs/; then
+            echo "::error::configs/ does not match what inventory.yml renders."
+            echo "Run 'python3 automation/render.py' and commit the result."
+            git diff --stat configs/
+            exit 1
+          fi
+
+      - name: Run checks
+        run: pytest tests/ -v

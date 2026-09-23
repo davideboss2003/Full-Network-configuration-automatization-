@@ -22,6 +22,34 @@ defaults:
   # Addresses .1 through .9 are reserved for infrastructure in every user subnet
   dhcp_reserved_upto: 9
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Point-to-point links between zone routers. Each is a /30: two usable
+# addresses, one per endpoint. The three together form a triangle, so any
+# single link may fail without partitioning the network.
+transit_links:
+  - subnet: 172.16.255.0/30
+    endpoints:
+      - { device: SN1-RTR, interface: gigabitEthernet 8/0, address: 172.16.255.1 }
+      - { device: SN2-RTR, interface: gigabitEthernet 7/0, address: 172.16.255.2 }
+  - subnet: 172.16.255.4/30
+    endpoints:
+      - { device: SN2-RTR, interface: gigabitEthernet 6/0, address: 172.16.255.5 }
+      - { device: SN3-RTR, interface: gigabitEthernet 6/0, address: 172.16.255.6 }
+  - subnet: 172.16.255.8/30
+    endpoints:
+      - { device: SN1-RTR, interface: gigabitEthernet 7/0, address: 172.16.255.9 }
+      - { device: SN3-RTR, interface: gigabitEthernet 7/0, address: 172.16.255.10 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+ospf:
+  process_id: 1
+  area: 0
+  router_ids:
+    SN1-RTR: 1.1.1.1
+    SN2-RTR: 2.2.2.2
+    SN3-RTR: 3.3.3.3
+
+# ─────────────────────────────────────────────────────────────────────────────
 zones:
 
   # ───────────────────────────────────────────────────────────────────────────

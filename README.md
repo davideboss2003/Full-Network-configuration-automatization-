@@ -1,5 +1,7 @@
 # Three-Building Campus Network
 
+[![validate](https://github.com/davideboss2003/Full-Network-configuration-automatization/actions/workflows/validate.yml/badge.svg)](https://github.com/davideboss2003/Full-Network-configuration-automatization/actions/workflows/validate.yml)
+
 A Cisco campus network for an institution spread across three buildings: segmented
 with VLANs, made redundant at both Layer 2 and Layer 3, addressed automatically,
 and published to the outside through a DMZ.
@@ -85,12 +87,47 @@ accepts no inbound SSH.
 
 ---
 
+## Validation
+
+```bash
+pytest tests/ -v
+```
+
+31 checks, run on every push. They cover the design and its translation into IOS
+separately, because the inventory can be right while the renderer is wrong.
+
+The design checks encode what the addressing plan depends on — VLAN identifiers
+matching their third octet, SVIs inside their own subnet, one deliberate
+spanning-tree root per zone, `/30` endpoints drawn from the same block, the
+three routers forming a closed triangle rather than a chain.
+
+The output checks inspect what the generator produces — trunk ports matching the
+inventory, no port left in the default VLAN, DHCP excluding the reserved range,
+the management VLAN kept out of DHCP so a switch cannot lose its address to an
+expired lease.
+
+One check is not about the network at all: it fails if a credential reaches a
+tracked file.
+
+**Each check was confirmed against a deliberately broken inventory.** Moving an
+SVI outside its subnet, declaring two root bridges in one zone, breaking trunk
+symmetry, drawing `/30` endpoints from different blocks, committing a real
+wireless key — every fault was caught by the intended check and by no other.
+Tests that only ever pass prove nothing.
+
+CI also re-renders the configurations and fails if `configs/` has drifted from
+what `inventory.yml` produces, so the committed output cannot fall out of step
+with its source.
+
+---
+
 ## Repository
 
 ```
-docs/latex/     Technical report (LaTeX source and figures)
 automation/     Inventory, Jinja2 templates, renderer
 configs/        Generated device configurations
+tests/          Design and output checks
+docs/latex/     Technical report (LaTeX source and figures)
 topology/       Packet Tracer file
 ```
 
