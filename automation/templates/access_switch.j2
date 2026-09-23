@@ -28,6 +28,17 @@ exit
 !
 {% endfor %}
 ! --- Access ports -----------------------------------------------------------
+!
+! Port security limits how many MAC addresses a port accepts. It counters MAC
+! flooding, where a table filled with fabricated addresses forces the switch to
+! flood every frame to every port, and it stops an unauthorised device being
+! plugged into a free socket.
+!
+! `restrict` drops the offending traffic and counts the violation while leaving
+! the port up. `shutdown` would disable it until an administrator intervenes,
+! which turns every relocated laptop into a support call.
+!
+{% set ps = defaults.port_security %}
 {% for r in access_ranges %}
 {% if r.first == r.last %}
 interface fastEthernet 0/{{ r.first }}
@@ -36,9 +47,31 @@ interface range fastEthernet 0/{{ r.first }}-{{ r.last }}
 {% endif %}
  switchport mode access
  switchport access vlan {{ zone.user_vlan.id }}
+ switchport port-security
+ switchport port-security maximum {{ ps.maximum }}
+ switchport port-security mac-address {{ ps.learning }}
+ switchport port-security violation {{ ps.violation }}
 exit
 !
 {% endfor %}
+{% if sw.get("ap_port") %}
+! The access point bridges every wireless client, so this port legitimately
+! carries many MAC addresses and is given a correspondingly higher limit.
+!
+interface fastEthernet 0/{{ sw.get("ap_port") }}
+ description Access point
+ switchport mode access
+ switchport access vlan {{ zone.user_vlan.id }}
+ switchport port-security
+ switchport port-security maximum {{ ps.ap_maximum }}
+ switchport port-security mac-address {{ ps.learning }}
+ switchport port-security violation {{ ps.violation }}
+exit
+!
+{% endif %}
+! Uplink ports carry tagged traffic from every VLAN and are left without a
+! MAC limit.
+!
 interface range gigabitEthernet 0/1-2
  switchport mode access
  switchport access vlan {{ zone.user_vlan.id }}

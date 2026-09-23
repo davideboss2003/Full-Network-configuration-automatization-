@@ -11,6 +11,35 @@ import pytest
 ALL_SWITCH_PORTS = set(range(1, 25))
 
 
+def interface_blocks(text):
+    """Parse the file into {interface line: [commands]}.
+
+    More robust than matching a fixed sequence of lines: a block may carry a
+    description, a port-security stanza or anything else between the interface
+    statement and the command being looked for.
+    """
+    blocks, current, name = {}, [], None
+    for line in commands(text):
+        if line.startswith(("interface ", "interface range ")):
+            name, current = line, []
+            blocks[name] = current
+        elif line == "exit":
+            name = None
+        elif name:
+            current.append(line)
+    return blocks
+
+
+def ports_in(interface_line):
+    """'interface range fastEthernet 0/5-24' -> {5..24}"""
+    m = re.search(r"fastEthernet 0/(\d+)(?:-(\d+))?$", interface_line)
+    if not m:
+        return set()
+    first = int(m.group(1))
+    last = int(m.group(2)) if m.group(2) else first
+    return set(range(first, last + 1))
+
+
 def commands(text):
     """Configuration lines only.
 
@@ -75,14 +104,9 @@ def test_every_port_is_either_trunk_or_access(inventory, rendered):
         trunk = {t["port"] for t in switch["trunks"]}
 
         access = set()
-        for first, last in re.findall(
-            r"interface range fastEthernet 0/(\d+)-(\d+)", text
-        ):
-            access |= set(range(int(first), int(last) + 1))
-        for single in re.findall(
-            r"interface fastEthernet 0/(\d+)\n switchport mode access", text
-        ):
-            access.add(int(single))
+        for interface, lines in interface_blocks(text).items():
+            if "switchport mode access" in lines:
+                access |= ports_in(interface)
 
         assert trunk & access == set(), (
             f"{switch['hostname']}: ports {sorted(trunk & access)} are both"
@@ -260,3 +284,55 @@ def test_a_banner_is_presented(rendered):
         assert any(l.startswith("banner motd") for l in commands(text)), (
             f"{hostname}: no login banner"
         )
+
+
+def test_access_ports_have_port_security(inventory, rendered):
+    """A port that accepts any number of MAC addresses accepts a flooding
+    attack, which forces the switch to behave as a hub."""
+    ps = inventory["defaults"]["port_security"]
+    for _, switch in switches(inventory):
+        text = rendered[switch["hostname"]]
+        assert "switchport port-security" in commands(text), (
+            f"{switch['hostname']}: no port security"
+        )
+        violations = set(re.findall(r"port-security violation (\S+)", text))
+        assert violations == {ps["violation"]}, (
+            f"{switch['hostname']}: violation mode {violations}"
+        )
+
+
+def test_port_security_is_absent_from_trunks(inventory, rendered):
+    """A trunk legitimately carries hundreds of MAC addresses from every VLAN.
+    Limiting it would break the link the first time the network is busy."""
+    for _, switch in switches(inventory):
+        text = rendered[switch["hostname"]]
+        blocks = interface_blocks(text)
+        for trunk in switch["trunks"]:
+            block = "\n".join(blocks[f"interface fastEthernet 0/{trunk['port']}"])
+            assert "port-security" not in block, (
+                f"{switch['hostname']} Fa0/{trunk['port']}: "
+                f"port security on a trunk towards {trunk['to']}"
+            )
+
+
+def test_the_access_point_port_allows_more_addresses(inventory, rendered):
+    """An access point bridges every wireless client, so its port carries one
+    MAC per client. The workstation limit would block the third user to
+    associate — a fault that looks like intermittent wireless."""
+    ps = inventory["defaults"]["port_security"]
+    for _, switch in switches(inventory):
+        ap_port = switch.get("ap_port")
+        if not ap_port:
+            continue
+        text = rendered[switch["hostname"]]
+        block = interface_blocks(text)[f"interface fastEthernet 0/{ap_port}"]
+        assert f"switchport port-security maximum {ps['ap_maximum']}" in block, (
+            f"{switch['hostname']} Fa0/{ap_port} carries the access point "
+            f"but is limited like a workstation port"
+        )
+
+
+def test_every_zone_has_exactly_one_access_point(inventory):
+    for name, zone in inventory["zones"].items():
+        with_ap = [sw["hostname"] for sw in zone["switches"] if sw.get("ap_port")]
+        assert len(with_ap) == 1, f"{name}: access point on {with_ap}"

@@ -15,6 +15,12 @@
 defaults:
   dns_server: 210.1.1.68
   domain: davide.ro
+  # Port security on access ports
+  port_security:
+    maximum: 2               # a workstation, plus one device behind it
+    violation: restrict      # block the offending traffic, keep the port up
+    learning: sticky         # learned addresses are written to the configuration
+    ap_maximum: 12           # an access point bridges every wireless client's MAC
   # Security baseline applied to every device
   rsa_modulus: 1024          # 2048 on production hardware; 1024 keeps Packet Tracer responsive
   exec_timeout: 5            # minutes before an idle session is dropped
@@ -99,6 +105,7 @@ zones:
           - { port: 3, to: SN1-SW3 }
           - { port: 4, to: SN1-SW1 }
       - hostname: SN1-SW3
+        ap_port: 1          # access point: many wireless MACs on one port
         mgmt_ip: 172.16.110.4
         stp: null
         trunks:
@@ -148,6 +155,7 @@ zones:
           - { port: 3, to: SN2-SW3 }
           - { port: 4, to: SN2-SW1 }
       - hostname: SN2-SW3
+        ap_port: 1          # access point: many wireless MACs on one port
         mgmt_ip: 172.16.120.4
         stp: null
         trunks:
@@ -194,6 +202,7 @@ zones:
           - { port: 1, to: SN3-SW1 }
           - { port: 2, to: SN3-SW3 }
       - hostname: SN3-SW3
+        ap_port: 1          # access point: many wireless MACs on one port
         mgmt_ip: 172.16.130.4
         stp: null
         trunks:

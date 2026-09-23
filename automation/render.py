@@ -96,10 +96,17 @@ def contiguous_ranges(numbers):
 
 
 def access_ranges_for(switch, defaults):
-    """Every FastEthernet port that is not carrying a trunk."""
+    """Every FastEthernet port that is neither a trunk nor the access point.
+
+    The access-point port is excluded because it needs a higher port-security
+    limit: an AP bridges every wireless client, so each of their MAC addresses
+    appears on that one port.
+    """
     first, last = defaults["access_ports"]["fastethernet"]
-    trunk_ports = {t["port"] for t in switch["trunks"]}
-    return contiguous_ranges(set(range(first, last + 1)) - trunk_ports)
+    excluded = {t["port"] for t in switch["trunks"]}
+    if switch.get("ap_port"):
+        excluded.add(switch["ap_port"])
+    return contiguous_ranges(set(range(first, last + 1)) - excluded)
 
 
 def dhcp_exclusion(zone, defaults):

@@ -93,7 +93,7 @@ accepts no inbound SSH.
 pytest tests/ -v
 ```
 
-52 checks, run on every push, in three suites.
+57 checks, run on every push, in three suites.
 
 One is a unit test in the usual sense: it covers `contiguous_ranges`, the
 function that turns "every port that is not a trunk" into the fewest
@@ -125,11 +125,17 @@ git-ignored; `configs/` is rendered with visible placeholders, and
 its subnet, two root bridges in one zone, an asymmetric trunk, mismatched `/30`
 endpoints, a committed key, a removed `enable secret`, telnet re-enabled.
 
-One check failed to catch its fault: it searched the whole file for
+Two gaps surfaced that way. One check searched the whole file for
 `enable secret`, and the string also appears in a comment, so it passed with the
-command deleted. It now reads configuration lines only. That is the point of
-injecting faults rather than trusting a green run — a check that cannot fail is
-worse than no check, because it is believed.
+command deleted; it now reads configuration lines only. Another followed the
+inventory rather than constraining it, so limiting the access-point port to two
+MAC addresses — enough to block wireless clients as they associate — left
+everything green.
+
+The second gap is the more interesting one. **Output checks verify consistency
+with the inventory; policy checks constrain what the inventory may say.** Both
+are needed, or the network can be broken by editing the source of truth without
+a single test turning red.
 
 CI also re-renders the configurations and fails if `configs/` has drifted from
 what `inventory.yml` produces, so the committed output cannot fall out of step

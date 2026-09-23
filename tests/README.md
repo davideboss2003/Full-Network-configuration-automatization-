@@ -39,6 +39,8 @@ Properties the addressing plan depends on, checked before anything is rendered:
 | Router-ids present and unique | An OSPF identity that changes when an interface does |
 | No wireless secrets committed | Credentials in a public repository |
 | Wireless is WPA2 with AES | Silently falling back to deprecated TKIP |
+| Port-security policy is coherent | A limit so high flooding still succeeds, learning that is lost on reload, or an access-point limit no higher than a workstation's |
+| One access point per zone | Two ports treated as uplinks for wireless clients |
 
 ## `test_rendered_configs.py` — the translation into IOS
 
@@ -66,6 +68,9 @@ current inventory and inspect the output:
 | Sessions time out | An unattended session anyone can walk up to |
 | Console authenticated too | vty locked while physical access is free |
 | Login banner present | — |
+| Access ports carry port security | A port accepting unlimited MAC addresses, and therefore a flooding attack |
+| Trunks carry none | A limit on a link that legitimately sees hundreds of addresses |
+| The access-point port allows more | Wireless clients blocked as they associate |
 
 ## `test_render_functions.py` — the algorithm
 
@@ -96,3 +101,13 @@ configuration lines only, through the `commands()` helper.
 
 That is the reason for injecting faults rather than trusting a green run: a
 check that cannot fail is worse than no check, because it is believed.
+
+A second gap appeared the same way. Limiting the access-point port to two
+addresses — enough to block wireless clients as they join — left every check
+passing, because the output checks compare against the inventory and follow it
+wherever it goes. Constraining what the inventory may say needs its own check,
+which is what `test_port_security_policy_is_coherent` does.
+
+The distinction is worth keeping: **output checks verify consistency, policy
+checks verify intent.** Without the second kind, the network can be broken by
+editing the source of truth while everything stays green.

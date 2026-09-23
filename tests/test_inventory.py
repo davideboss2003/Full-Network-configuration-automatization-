@@ -206,3 +206,29 @@ def test_wireless_uses_wpa2(inventory):
             f"{name}: {wireless['encryption']} rather than AES — "
             "TKIP is deprecated"
         )
+
+
+def test_port_security_policy_is_coherent(inventory):
+    """Policy, not consistency.
+
+    The checks on the rendered output compare against the inventory, so they
+    follow it wherever it goes. These constrain what the inventory may say.
+    """
+    ps = inventory["defaults"]["port_security"]
+
+    assert ps["violation"] in {"protect", "restrict", "shutdown"}, (
+        f"unknown violation mode: {ps['violation']}"
+    )
+    assert ps["learning"] in {"sticky", "static"}, (
+        "dynamic learning is lost on reload, leaving the port unprotected "
+        "after a power cycle"
+    )
+    assert 1 <= ps["maximum"] <= 4, (
+        f"maximum {ps['maximum']} on a workstation port is high enough that "
+        "flooding would succeed before the limit is reached"
+    )
+    assert ps["ap_maximum"] > ps["maximum"] * 2, (
+        f"an access point bridges one MAC per wireless client; a limit of "
+        f"{ps['ap_maximum']} against {ps['maximum']} for a workstation is not "
+        "a meaningful distinction, and clients would be blocked as they join"
+    )
