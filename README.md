@@ -200,6 +200,4 @@ It also records what was learned in the process: why a ping failing in one
 direction and succeeding in the other locates a missing default gateway, and why
 a `TTL` of 254 rather than 255 proves a packet was routed rather than switched.
 
----
 
-Built in Cisco Packet Tracer · Muresan Davide-Andrei · Technical University of Cluj-Napoca
