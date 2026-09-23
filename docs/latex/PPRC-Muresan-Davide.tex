@@ -1302,6 +1302,163 @@ On production equipment the values would come from a vault rather than a file
 on disk, but the separation is the same: the design is public, the secrets are
 not.
 
+\newpage
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Access Layer Protection}
+
+Two measures protect the edge of the network, where users and their equipment
+attach.
+
+\subsection{Port security}
+
+A switch learns MAC addresses as it sees traffic and keeps them in a table of
+finite size. An attacker who floods a port with frames carrying fabricated
+source addresses fills that table, after which the switch can no longer learn
+anything new and begins flooding every frame to every port --- behaving as a
+hub. From that moment the attacker observes the traffic of the entire segment.
+Tools that generate well over a hundred thousand addresses per minute are
+freely available.
+
+Port security limits how many addresses a port accepts.
+
+\begin{lstlisting}
+interface range fastEthernet 0/5-24
+ switchport mode access
+ switchport access vlan 10
+ switchport port-security
+ switchport port-security maximum 2
+ switchport port-security mac-address sticky
+ switchport port-security violation restrict
+exit
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{} l p{9cm} @{}}
+\toprule
+\texttt{maximum 2} & A workstation, and one device behind it such as an IP
+  telephone. Low enough that flooding fails immediately. \\
+\texttt{mac-address sticky} & Learned addresses are written into the running
+  configuration, so they survive a reload. Dynamic learning would leave the
+  port unprotected after a power cycle. \\
+\texttt{violation restrict} & Traffic from an unauthorised address is dropped
+  and the violation counted, while the port stays up. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The alternative to \texttt{restrict} is \texttt{shutdown}, which disables the
+port until an administrator re-enables it. It is stricter, but in a network
+with users it converts every relocated laptop into a support call. The traffic
+is blocked either way; the difference is who is inconvenienced.
+
+\subsubsection*{Two exceptions}
+
+\textbf{Trunk ports carry no limit.} A trunk legitimately transports hundreds of
+addresses from every VLAN that crosses it. A limit there would break the link
+the first time the network is busy.
+
+\textbf{The access-point port is given a higher limit.} An access point bridges
+its wireless clients, so one MAC address per client appears on that single
+switch port. Applying the workstation limit would block the third user to
+associate --- a fault that presents as intermittent wireless rather than as a
+security control, and is correspondingly hard to diagnose.
+
+\begin{lstlisting}
+interface fastEthernet 0/1
+ description Access point
+ switchport port-security maximum 12
+\end{lstlisting}
+
+\subsubsection*{Verification}
+
+\begin{lstlisting}
+SN1-SW3#show port-security
+
+Secure Port  MaxSecureAddr  CurrentAddr  SecurityViolation  Security Action
+                (Count)       (Count)         (Count)
+-----------------------------------------------------------------------------
+Fa0/1             12             1               0             Restrict
+Fa0/3              2             1               0             Restrict
+\end{lstlisting}
+
+\begin{lstlisting}
+SN1-SW3#show port-security address
+
+Vlan   Mac Address       Type            Ports    Remaining Age
+10     0001.C9DD.8748    SecureSticky    Fa0/3    -
+\end{lstlisting}
+
+\texttt{SecureSticky} confirms the address was learned automatically and
+recorded in the configuration.
+
+Changing a host's MAC address and generating traffic increments the violation
+counter while the port remains \texttt{Secure-up}: the unauthorised traffic is
+discarded, the legitimate address continues to work, and no administrative
+action is required.
+
+\subsection{Protection against VLAN hopping}
+
+VLAN hopping lets a host reach a VLAN it was never assigned to. Two variants
+exist, and both are addressed by configuration applied when the switches were
+first built.
+
+\subsubsection*{Switch spoofing}
+
+Cisco ports negotiate their own role by default through DTP. A port left in its
+default state can be persuaded to become a trunk by an attacking device that
+speaks the protocol, and a trunk carries every VLAN.
+
+Every port is therefore pinned explicitly:
+
+\begin{lstlisting}
+switchport mode access
+\end{lstlisting}
+
+A port in \texttt{access} mode does not negotiate and cannot be turned into a
+trunk from the far end.
+
+\subsubsection*{Double tagging}
+
+An attacker sends a frame carrying two VLAN tags. The first switch strips the
+outer tag and forwards the frame, which then reaches a second switch still
+carrying the inner tag and is delivered to the VLAN named by it. The attack
+depends on the outer tag matching the trunk's native VLAN, which by default is
+VLAN~1.
+
+Two decisions remove the opportunity:
+
+\begin{lstlisting}
+switchport trunk allowed vlan 10,110
+\end{lstlisting}
+
+A trunk permits all 4094 VLANs unless told otherwise. Restricting it to the two
+in use means a frame tagged for anything else is discarded rather than
+forwarded.
+
+And every port on every switch was placed in a user or management VLAN, leaving
+VLAN~1 empty:
+
+\begin{lstlisting}
+SN2-SW1#show vlan brief
+
+VLAN Name                       Status    Ports
+---- -------------------------- --------- ---------------------------------
+1    default                    active
+20   Users-SN2                  active    Fa0/4, Fa0/5, ...
+120  Mgmt-SN2                   active
+\end{lstlisting}
+
+No port belongs to VLAN~1, so no host can originate a frame whose outer tag
+matches the native VLAN of a trunk.
+
+\subsubsection*{Why this counts as a measure}
+
+Neither element is exotic; both are single commands. They appear here because
+the default behaviour of a Cisco switch is the insecure one, and because a port
+left in its default state is indistinguishable, in a diagram, from one that was
+configured deliberately.
+
 % ═════════════════════════════════════════════════════════════════════════════
 \part*{Part IV --- Automation}
 \addcontentsline{toc}{part}{Part IV --- Automation}
@@ -1430,7 +1587,7 @@ WPA2 on wireless networks                & done & Section 9 \\
 OSPF authentication                      & \textit{planned} & ---  \\
 Address translation towards the provider & \textit{planned} & ---  \\
 Privilege levels, password encryption, SSH-only management & done & Section 15 \\
-Two additional security measures         & \textit{planned} & ---  \\
+Two additional security measures         & done & Section 16 \\
 \bottomrule
 \end{tabular}
 \end{table}

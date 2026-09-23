@@ -25,6 +25,8 @@ inventory** rather than typed by hand.
 | **Wireless** | One access point per building, WPA2-PSK with AES, sharing the user VLAN with cabled hosts |
 | **DMZ** | HTTP, FTP, DNS and mail on public addresses behind a dedicated switch and VLAN |
 | **External link** | Point-to-point fibre to a provider router, with a simulated external network |
+| **Management plane** | Hashed passwords, two privilege levels, SSH v2 only with telnet refused, authenticated console, idle timeouts |
+| **Access layer** | Port security with sticky learning on every access port; VLAN hopping closed off by pinning port roles, restricting trunks and emptying VLAN 1 |
 
 ## Addressing
 
@@ -84,6 +86,41 @@ The difference of ten is the VLAN identifier.
 Jinja2 is the engine Ansible uses internally, so the templates carry over to an
 Ansible workflow unchanged. Delivery here is manual only because Packet Tracer
 accepts no inbound SSH.
+
+---
+
+## Security
+
+Devices originally required no authentication at all: reaching a console meant
+reaching privileged mode. The baseline now applied to all thirteen devices under
+our control covers hashed passwords, an operator account at privilege 5 and an
+administrator at 15, RSA keys with SSH version 2 as the only permitted remote
+transport, an authenticated console, idle timeouts and a login banner.
+
+```
+C:\>telnet 172.16.120.2
+Trying 172.16.120.2 ...Open
+
+[Connection to 172.16.120.2 closed by foreign host]
+```
+
+That is the result worth reading closely. The TCP connection is accepted and
+then closed before any prompt appears — the session is refused by
+`transport input ssh` rather than by a failed login, so no credential is ever
+transmitted.
+
+**Access ports carry port security**: two MAC addresses, learned sticky so they
+survive a reload, with violations restricted rather than shutting the port down.
+Trunks are deliberately excluded — they legitimately carry hundreds of addresses
+— and the access-point port is given a higher limit, because an AP bridges one
+MAC per wireless client and the workstation limit would block the third user to
+associate.
+
+**Credentials stay out of the repository.** They live in
+`automation/secrets.yml`, which is git-ignored. `configs/` is rendered with
+visible placeholders and committed; `render.py --deploy` writes the real files
+to `build/`, which is not. One check fails if a value that is not a placeholder
+reaches a committed file.
 
 ---
 
