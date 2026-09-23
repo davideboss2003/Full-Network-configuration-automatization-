@@ -1129,9 +1129,182 @@ expected result at this stage: they hold RFC~1918 private addresses, which are
 not routable beyond the site boundary. Address translation on the border router
 is the mechanism that resolves this.
 
+\newpage
 % ═════════════════════════════════════════════════════════════════════════════
-\part*{Part III --- Automation}
-\addcontentsline{toc}{part}{Part III --- Automation}
+\part*{Part III --- Security}
+\addcontentsline{toc}{part}{Part III --- Security}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Management Plane Hardening}
+
+Until this point no device required authentication. Reaching a console meant
+reaching privileged mode: \texttt{enable} returned a prompt without asking for
+anything. Any person with physical access to a console port held the network.
+
+The baseline below is applied to all thirteen devices under our control. The
+provider router and the switch behind it are not ours to configure.
+
+\subsection{Passwords}
+
+\begin{lstlisting}
+service password-encryption
+!
+enable secret Cluj2026!enable
+\end{lstlisting}
+
+The two commands do different things and are often confused.
+
+\texttt{enable secret} stores a one-way hash. The password cannot be recovered
+from the configuration, only verified against it.
+
+\texttt{service password-encryption} obscures the plaintext that remains
+elsewhere in the configuration, using a reversible cipher. It stops a password
+being read over someone's shoulder; it does not stop anyone determined. It is
+not a substitute for \texttt{secret}, which is why both are present.
+
+\subsection{Accounts at separate privilege levels}
+
+\begin{lstlisting}
+username operator privilege 5 secret Cluj2026!operator
+username admin privilege 15 secret Cluj2026!admin
+!
+privilege exec level 5 show
+privilege exec level 5 show running-config
+privilege exec level 5 ping
+\end{lstlisting}
+
+Level 15 is full administrative access. Level 5 is defined explicitly: an
+account at that level may inspect the device and test reachability, but the
+configuration commands remain out of reach.
+
+Without the three \texttt{privilege exec} lines, level 5 would carry almost no
+commands at all, making the account useless rather than limited. Defining what
+the level contains is what turns it into a working distinction.
+
+Both accounts use \texttt{secret} rather than \texttt{password}: the second
+stores the value reversibly and offers no protection to anyone who can read the
+configuration.
+
+\subsection{Remote access}
+
+\begin{lstlisting}
+ip domain-name davide.ro
+crypto key generate rsa
+1024
+!
+ip ssh version 2
+ip ssh time-out 60
+ip ssh authentication-retries 3
+!
+line vty 0 4
+ login local
+ transport input ssh
+ exec-timeout 5 0
+exit
+\end{lstlisting}
+
+The order matters. RSA key generation requires both a hostname and a domain
+name, and fails without them; the key is named from the two together, here
+\texttt{SN2-SW1.davide.ro}.
+
+\texttt{transport input ssh} is the command that satisfies the requirement.
+Without it the lines accept Telnet, which carries credentials across the
+network in clear text. Version 2 is specified because version 1 has known
+weaknesses and would otherwise remain acceptable.
+
+\subsection{Console and banner}
+
+\begin{lstlisting}
+line console 0
+ login local
+ exec-timeout 5 0
+ logging synchronous
+exit
+!
+banner motd #
+Authorised access only. Activity on this device is logged.
+Disconnect immediately if you are not an authorised user.
+#
+\end{lstlisting}
+
+Restricting the virtual lines while leaving the console open protects nothing
+from anyone standing in front of the equipment, so the console is authenticated
+on the same terms.
+
+The idle timeout matters more than it appears: an unattended session left open
+is an authenticated session anyone passing by can use.
+
+\subsection{Verification}
+
+From a host in the user VLAN:
+
+\begin{lstlisting}
+C:\>ssh -l admin 172.16.120.2
+Password:
+
+Authorised access only. Activity on this device is logged.
+Disconnect immediately if you are not an authorised user.
+
+SN2-SW1#
+\end{lstlisting}
+
+The banner is presented after authentication, and the account reaches
+privileged mode directly.
+
+\begin{lstlisting}
+C:\>telnet 172.16.120.2
+Trying 172.16.120.2 ...Open
+
+[Connection to 172.16.120.2 closed by foreign host]
+\end{lstlisting}
+
+This is the result that demonstrates the requirement. The TCP connection is
+accepted --- port 23 is listening --- and then closed immediately, before any
+prompt is offered. The session is rejected by \texttt{transport input ssh}
+rather than by a failed login, so no credential is ever transmitted.
+
+A third observation came from a slow attempt at the password prompt:
+
+\begin{lstlisting}
+% Password:  timeout expired!
+% Login invalid
+\end{lstlisting}
+
+The authentication timeout is enforced as configured.
+
+\subsection{Credentials and version control}
+
+The configurations are generated, and the generated files are committed. A
+password written into a template would therefore reach the repository, where it
+remains in the history even after being removed.
+
+Credentials are held in \texttt{automation/secrets.yml}, which is excluded from
+version control, and the generator writes to two separate targets:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{} l l c @{}}
+\toprule
+\textbf{Target} & \textbf{Contents} & \textbf{Committed} \\
+\midrule
+\texttt{configs/} & placeholders in place of passwords & yes \\
+\texttt{build/}   & real credentials & no \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Rendering without the secrets file succeeds and emits visible placeholders, so
+the structure of every configuration remains reviewable and the automated
+checks run without anyone holding the passwords. One of those checks fails if a
+value that is not a placeholder appears in a committed file.
+
+On production equipment the values would come from a vault rather than a file
+on disk, but the separation is the same: the design is public, the secrets are
+not.
+
+% ═════════════════════════════════════════════════════════════════════════════
+\part*{Part IV --- Automation}
+\addcontentsline{toc}{part}{Part IV --- Automation}
 
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Configuration Generation}
@@ -1256,7 +1429,7 @@ ISP link, simulated external network      & done & Section 13 \\
 WPA2 on wireless networks                & done & Section 9 \\
 OSPF authentication                      & \textit{planned} & ---  \\
 Address translation towards the provider & \textit{planned} & ---  \\
-Privilege levels, password encryption, SSH-only management & \textit{planned} & ---  \\
+Privilege levels, password encryption, SSH-only management & done & Section 15 \\
 Two additional security measures         & \textit{planned} & ---  \\
 \bottomrule
 \end{tabular}
