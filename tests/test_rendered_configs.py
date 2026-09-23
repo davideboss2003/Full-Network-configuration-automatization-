@@ -24,6 +24,14 @@ def commands(text):
     ]
 
 
+STANDALONE = "_hardening"
+
+
+def devices(rendered):
+    """Every generated file except the standalone baseline."""
+    return {k: v for k, v in rendered.items() if k != STANDALONE}
+
+
 def switches(inventory):
     for zone in inventory["zones"].values():
         for switch in zone["switches"]:
@@ -33,6 +41,7 @@ def switches(inventory):
 def test_one_file_per_device(inventory, rendered):
     expected = {sw["hostname"] for _, sw in switches(inventory)}
     expected |= {f"{z['router']['hostname']}-lan" for z in inventory["zones"].values()}
+    expected |= {"_hardening"}      # baseline on its own, for devices outside the inventory
     assert set(rendered) == expected
 
 

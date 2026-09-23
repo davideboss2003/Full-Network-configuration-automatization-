@@ -155,6 +155,21 @@ def main(selected_zones, deploy=False):
         path.write_text(text)
         written.append(path)
 
+    # The security baseline is identical on every device, so it is also emitted
+    # on its own. Devices outside the per-zone pattern — the DMZ switch, or any
+    # equipment added later — can be hardened without being in the inventory.
+    standalone = env.get_template("_hardening.j2").render(
+        defaults=defaults, secrets=secrets
+    )
+    path = output / "_hardening.cfg"
+    path.write_text(
+        "! Security baseline, for any device not covered by a per-zone file.\n"
+        "! Paste after `configure terminal`.\n"
+        + standalone
+        + "end\n!\ncopy running-config startup-config\n"
+    )
+    written.append(path)
+
     for path in written:
         print(f"  {path.relative_to(ROOT)}")
     print(f"\n{len(written)} configurations written to {output.relative_to(ROOT)}/")
