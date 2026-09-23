@@ -1,6 +1,6 @@
 # Three-Building Campus Network
 
-[![validate](https://github.com/davideboss2003/Full-Network-configuration-automatization/actions/workflows/validate.yml/badge.svg)](https://github.com/davideboss2003/Full-Network-configuration-automatization/actions/workflows/validate.yml)
+[![validate](https://github.com/davideboss2003/Full-Network-configuration-automatization-/actions/workflows/validate.yml/badge.svg)](https://github.com/davideboss2003/Full-Network-configuration-automatization-/actions/workflows/validate.yml)
 
 A Cisco campus network for an institution spread across three buildings: segmented
 with VLANs, made redundant at both Layer 2 and Layer 3, addressed automatically,
