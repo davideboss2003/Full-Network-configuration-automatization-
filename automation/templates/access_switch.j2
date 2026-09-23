@@ -63,6 +63,7 @@ spanning-tree vlan {{ zone.user_vlan.id }},{{ zone.mgmt_vlan.id }} root {{ sw.st
 ! the one that blocks a port to break the loop.
 !
 {% endif %}
+{% include '_hardening.j2' %}
 end
 !
 copy running-config startup-config

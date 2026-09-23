@@ -22,11 +22,35 @@ combines them. A change to a VLAN number or an SVI address is made once.
 ## Usage
 
 ```bash
-python3 automation/render.py            # all zones
-python3 automation/render.py SN1 SN3    # selected zones
+python3 automation/render.py            # -> configs/, with placeholders
+python3 automation/render.py SN1 SN3    # selected zones only
+python3 automation/render.py --deploy   # -> build/, with real credentials
 ```
 
 Requires `pyyaml` and `jinja2`.
+
+## Two output targets
+
+Credentials must not reach version control, but the generated configurations
+should still be reviewable. So there are two targets:
+
+| Target | Contents | Committed |
+|---|---|---|
+| `configs/` | placeholders in place of passwords | yes |
+| `build/` | real credentials from `secrets.yml` | no — git-ignored |
+
+`configs/` is what CI verifies: it re-renders and fails if the committed output
+has drifted from the inventory. `build/` is what goes onto the equipment.
+
+To render for deployment:
+
+```bash
+cp automation/secrets.yml.example automation/secrets.yml
+# fill in the values
+python3 automation/render.py --deploy
+```
+
+On a production estate those values would come from a vault rather than a file.
 
 ## Files
 

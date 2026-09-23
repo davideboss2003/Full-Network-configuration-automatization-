@@ -57,7 +57,15 @@ current inventory and inspect the output:
 | Physical interface unaddressed | An address on the trunk itself |
 | DHCP excludes the reserved range | Allocation beginning at the gateway's own address |
 | Management VLAN not served by DHCP | A switch losing its address to an expired lease |
-| No credentials in generated files | Secrets reaching version control |
+| Committed output carries placeholders | A real credential reaching version control |
+| Every device has `enable secret` | An unauthenticated device: console access is full access |
+| Passwords hashed, not stored reversibly | `password` where `secret` was meant |
+| Two privilege levels defined | One account used for both inspection and change |
+| Remote access restricted to SSH v2 | Telnet, which carries credentials in clear text |
+| Domain name set before key generation | RSA generation failing silently |
+| Sessions time out | An unattended session anyone can walk up to |
+| Console authenticated too | vty locked while physical access is free |
+| Login banner present | — |
 
 ## `test_render_functions.py` — the algorithm
 
@@ -74,7 +82,17 @@ is ever emitted as access.
 
 ## Fault injection
 
-Each check was confirmed against a deliberately broken inventory: moving an SVI
-outside its subnet, declaring two root bridges in one zone, breaking trunk
-symmetry, drawing `/30` endpoints from different blocks, and committing a real
-wireless key. Every fault was caught by the intended check and by no other.
+Each check was confirmed against deliberately broken input: an SVI moved outside
+its subnet, two root bridges in one zone, an asymmetric trunk, `/30` endpoints
+drawn from different blocks, a committed wireless key, a removed `enable secret`,
+an account stored with a reversible password, telnet re-enabled, a session left
+without a timeout, an unauthenticated console, and an RSA key generated before
+the domain name was set.
+
+**One check failed to catch its fault.** `test_every_device_requires_a_privileged_password`
+searched the whole file for `enable secret`, and the string also appears in an
+explanatory comment — so the check passed with the command deleted. It now reads
+configuration lines only, through the `commands()` helper.
+
+That is the reason for injecting faults rather than trusting a green run: a
+check that cannot fail is worse than no check, because it is believed.

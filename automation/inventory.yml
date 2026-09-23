@@ -15,6 +15,13 @@
 defaults:
   dns_server: 210.1.1.68
   domain: davide.ro
+  # Security baseline applied to every device
+  rsa_modulus: 1024          # 2048 on production hardware; 1024 keeps Packet Tracer responsive
+  exec_timeout: 5            # minutes before an idle session is dropped
+  banner_delimiter: "#"
+  banner: |-
+    Authorised access only. Activity on this device is logged.
+    Disconnect immediately if you are not an authorised user.
   # Every switch port that is not a trunk becomes an access port in the user VLAN
   access_ports:
     fastethernet: [1, 24]

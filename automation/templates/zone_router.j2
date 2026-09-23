@@ -39,6 +39,7 @@ ip dhcp pool {{ zone.router.dhcp_pool }}
  dns-server {{ defaults.dns_server }}
 exit
 !
+{% include '_hardening.j2' %}
 end
 !
 copy running-config startup-config

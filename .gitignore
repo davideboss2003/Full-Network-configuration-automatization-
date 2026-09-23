@@ -17,3 +17,7 @@ verification/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Credentials — never committed
+automation/secrets.yml
+build/

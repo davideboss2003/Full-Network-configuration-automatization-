@@ -1,0 +1,49 @@
+!
+! ── Security ────────────────────────────────────────────────────────────────
+!
+! Passwords stored as hashes, and the remaining plaintext in the configuration
+! obscured. `enable secret` uses a one-way hash; `service password-encryption`
+! only obscures, and is not a substitute for it.
+!
+service password-encryption
+!
+enable secret {{ secrets.enable_secret }}
+!
+! Two privilege levels. The operator account can inspect the device but not
+! change it; the administrative account has full rights.
+!
+username {{ secrets.users.operator.name }} privilege {{ secrets.users.operator.privilege }} secret {{ secrets.users.operator.password }}
+username {{ secrets.users.admin.name }} privilege {{ secrets.users.admin.privilege }} secret {{ secrets.users.admin.password }}
+!
+privilege exec level {{ secrets.users.operator.privilege }} show
+privilege exec level {{ secrets.users.operator.privilege }} show running-config
+privilege exec level {{ secrets.users.operator.privilege }} ping
+!
+! SSH requires a hostname, a domain name and an RSA key pair, in that order.
+!
+ip domain-name {{ defaults.domain }}
+crypto key generate rsa
+{{ defaults.rsa_modulus }}
+!
+ip ssh version 2
+ip ssh time-out 60
+ip ssh authentication-retries 3
+!
+! Remote access over SSH only. Telnet carries credentials in clear text.
+!
+line vty 0 4
+ login local
+ transport input ssh
+ exec-timeout {{ defaults.exec_timeout }} 0
+exit
+!
+line console 0
+ login local
+ exec-timeout {{ defaults.exec_timeout }} 0
+ logging synchronous
+exit
+!
+banner motd {{ defaults.banner_delimiter }}
+{{ defaults.banner }}
+{{ defaults.banner_delimiter }}
+!

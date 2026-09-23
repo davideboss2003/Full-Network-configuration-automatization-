@@ -93,7 +93,7 @@ accepts no inbound SSH.
 pytest tests/ -v
 ```
 
-44 checks, run on every push, in three suites.
+52 checks, run on every push, in three suites.
 
 One is a unit test in the usual sense: it covers `contiguous_ranges`, the
 function that turns "every port that is not a trunk" into the fewest
@@ -111,14 +111,25 @@ inventory, no port left in the default VLAN, DHCP excluding the reserved range,
 the management VLAN kept out of DHCP so a switch cannot lose its address to an
 expired lease.
 
-One check is not about the network at all: it fails if a credential reaches a
-tracked file.
+Nine cover the security baseline: every device requires a privileged password,
+accounts are hashed rather than stored reversibly, two privilege levels exist,
+remote access is SSH v2 with telnet refused, sessions time out, and the console
+is authenticated rather than left open to anyone with physical access.
 
-**Each check was confirmed against a deliberately broken inventory.** Moving an
-SVI outside its subnet, declaring two root bridges in one zone, breaking trunk
-symmetry, drawing `/30` endpoints from different blocks, committing a real
-wireless key — every fault was caught by the intended check and by no other.
-Tests that only ever pass prove nothing.
+One check is not about the network at all: it fails if a real credential reaches
+a committed file. Passwords live in `automation/secrets.yml`, which is
+git-ignored; `configs/` is rendered with visible placeholders, and
+`render.py --deploy` writes the real files to `build/`.
+
+**Each check was confirmed against deliberately broken input** — an SVI outside
+its subnet, two root bridges in one zone, an asymmetric trunk, mismatched `/30`
+endpoints, a committed key, a removed `enable secret`, telnet re-enabled.
+
+One check failed to catch its fault: it searched the whole file for
+`enable secret`, and the string also appears in a comment, so it passed with the
+command deleted. It now reads configuration lines only. That is the point of
+injecting faults rather than trusting a green run — a check that cannot fail is
+worse than no check, because it is believed.
 
 CI also re-renders the configurations and fails if `configs/` has drifted from
 what `inventory.yml` produces, so the committed output cannot fall out of step

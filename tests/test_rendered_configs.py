@@ -11,6 +11,19 @@ import pytest
 ALL_SWITCH_PORTS = set(range(1, 25))
 
 
+def commands(text):
+    """Configuration lines only.
+
+    Comments are documentation, not behaviour. A check that reads them will
+    pass on a device where the command itself was never issued — which is how
+    a test becomes worse than no test at all.
+    """
+    return [
+        line.strip() for line in text.splitlines()
+        if line.strip() and not line.strip().startswith("!")
+    ]
+
+
 def switches(inventory):
     for zone in inventory["zones"].values():
         for switch in zone["switches"]:
@@ -154,10 +167,87 @@ def test_the_management_vlan_is_not_served_by_dhcp(inventory, rendered):
         assert zone["mgmt_vlan"]["subnet"] not in pools
 
 
-def test_generated_files_contain_no_credentials(rendered):
-    forbidden = re.compile(
-        r"\b(password|secret|passphrase)\s+\S", re.IGNORECASE
-    )
+def test_committed_configs_carry_placeholders_not_credentials(rendered):
+    """configs/ is committed, so every credential in it must be a placeholder.
+
+    Real values live in automation/secrets.yml, which is git-ignored, and reach
+    only build/ when rendering with --deploy.
+    """
+    credential = re.compile(r"\b(?:secret|password)\s+(\S+)")
     for hostname, text in rendered.items():
-        found = forbidden.findall(text)
-        assert not found, f"{hostname}: possible credential in a tracked file"
+        for value in credential.findall(text):
+            assert value.startswith("<"), (
+                f"{hostname}: '{value}' looks like a real credential "
+                f"in a committed file"
+            )
+
+
+def test_every_device_requires_a_privileged_password(rendered):
+    """Without `enable secret`, anyone reaching the console owns the device."""
+    for hostname, text in rendered.items():
+        issued = [l for l in commands(text) if l.startswith("enable secret ")]
+        assert issued, f"{hostname}: no enable secret"
+
+
+def test_passwords_are_hashed_not_stored_in_clear(rendered):
+    """`secret` hashes; `password` stores reversibly. Never the second."""
+    for hostname, text in rendered.items():
+        weak = re.findall(r"^username \S+ privilege \d+ password ", text, re.M)
+        assert not weak, f"{hostname}: account stored with a reversible password"
+        assert "service password-encryption" in commands(text), (
+            f"{hostname}: remaining plaintext not obscured"
+        )
+
+
+def test_two_privilege_levels_are_defined(rendered):
+    """One account to inspect, one to change — not a single account for both."""
+    for hostname, text in rendered.items():
+        levels = {int(p) for p in re.findall(r"^username \S+ privilege (\d+)", text, re.M)}
+        assert len(levels) >= 2, f"{hostname}: only privilege {levels}"
+        assert 15 in levels, f"{hostname}: no administrative account"
+
+
+def test_remote_access_is_ssh_only(rendered):
+    """Telnet carries credentials in clear text across the network."""
+    for hostname, text in rendered.items():
+        lines = commands(text)
+        assert "transport input ssh" in lines, f"{hostname}: vty not restricted"
+        assert not [l for l in lines if "telnet" in l.lower()], (
+            f"{hostname}: telnet permitted"
+        )
+        assert "ip ssh version 2" in lines, f"{hostname}: SSH v1 still accepted"
+
+
+def test_ssh_prerequisites_precede_key_generation(rendered):
+    """RSA key generation fails unless a domain name is already set."""
+    for hostname, text in rendered.items():
+        lines = commands(text)
+        domain = next(i for i, l in enumerate(lines) if l.startswith("ip domain-name"))
+        keygen = next(i for i, l in enumerate(lines) if l.startswith("crypto key generate"))
+        assert domain < keygen, f"{hostname}: key generated before domain name"
+
+
+def test_sessions_time_out(rendered):
+    """An unattended session left open is an authenticated session anyone
+    can walk up to."""
+    for hostname, text in rendered.items():
+        timeouts = re.findall(r"exec-timeout (\d+) 0", text)
+        assert timeouts, f"{hostname}: no idle timeout"
+        assert all(0 < int(t) <= 15 for t in timeouts), (
+            f"{hostname}: timeout {timeouts} is absent or too long"
+        )
+
+
+def test_console_requires_authentication_too(rendered):
+    """Restricting vty while leaving the console open protects nothing from
+    anyone with physical access."""
+    for hostname, text in rendered.items():
+        console = text.split("line console 0")[1].split("exit")[0]
+        assert "login local" in console, f"{hostname}: console unauthenticated"
+
+
+def test_a_banner_is_presented(rendered):
+    for hostname, text in rendered.items():
+        assert any(l.startswith("banner motd") for l in commands(text)), (
+            f"{hostname}: no login banner"
+        )
