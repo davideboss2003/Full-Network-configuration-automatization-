@@ -93,8 +93,13 @@ accepts no inbound SSH.
 pytest tests/ -v
 ```
 
-31 checks, run on every push. They cover the design and its translation into IOS
-separately, because the inventory can be right while the renderer is wrong.
+44 checks, run on every push, in three suites.
+
+One is a unit test in the usual sense: it covers `contiguous_ranges`, the
+function that turns "every port that is not a trunk" into the fewest
+`interface range` statements. The other two are configuration validation —
+they cover the design and its translation into IOS separately, because the
+inventory can be right while the renderer is wrong.
 
 The design checks encode what the addressing plan depends on — VLAN identifiers
 matching their third octet, SVIs inside their own subnet, one deliberate

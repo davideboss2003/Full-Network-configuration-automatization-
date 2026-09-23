@@ -4,7 +4,20 @@
 pytest tests/ -v
 ```
 
-Two suites, run on every push by `.github/workflows/validate.yml`.
+Three suites, run on every push by `.github/workflows/validate.yml`.
+
+They test different things, and the distinction matters when one fails:
+
+| Suite | Subject | Answers |
+|---|---|---|
+| `test_render_functions.py` | a function | is the algorithm correct? |
+| `test_inventory.py` | data | is the design coherent with itself? |
+| `test_rendered_configs.py` | generated files | did the design translate correctly into IOS? |
+
+Only the first is a unit test in the usual sense. The other two are
+configuration validation — the plan and its output are data, not logic, and a
+fault in either produces a network that is wrong without anything having
+crashed.
 
 ## `test_inventory.py` — the design
 
@@ -45,6 +58,19 @@ current inventory and inspect the output:
 | DHCP excludes the reserved range | Allocation beginning at the gateway's own address |
 | Management VLAN not served by DHCP | A switch losing its address to an expired lease |
 | No credentials in generated files | Secrets reaching version control |
+
+## `test_render_functions.py` — the algorithm
+
+`contiguous_ranges` is the only real logic in the generator: it turns "every
+port that is not a trunk" into the fewest `interface range` statements. Trunks
+on ports 1, 3 and 4 must leave port 2 alone and ports 5–24 whole.
+
+It is tested directly rather than only through its output, because a fault here
+produces configurations that look plausible while leaving ports unconfigured.
+The suite covers empty input, a single port, consecutive ports, gaps, isolated
+ports between ranges, unsorted input, and two properties that must hold for any
+trunk layout: every input port appears in exactly one range, and no trunk port
+is ever emitted as access.
 
 ## Fault injection
 
